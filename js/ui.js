@@ -1,7 +1,7 @@
 import { getBox, getRelatedIndices } from './puzzle.js';
 import { formatTime } from './timer.js';
 
-export function renderBoard(state, selectedIndex, pencilMode) {
+export function renderBoard(state, selectedIndex, pencilMode, highlightNumber = null) {
   const board = document.getElementById('board');
   board.innerHTML = '';
 
@@ -41,6 +41,7 @@ export function renderBoard(state, selectedIndex, pencilMode) {
     if (i === selectedIndex) cell.classList.add('selected');
     else if (relatedSet.has(i)) cell.classList.add('related');
     if (sameNumberSet.has(i) && i !== selectedIndex) cell.classList.add('same-number');
+    if (highlightNumber !== null && state.board[i] === highlightNumber) cell.classList.add('number-locked');
     if (!isGiven) cell.classList.add('editable');
 
     cell.setAttribute('role', 'gridcell');
@@ -247,22 +248,60 @@ export function setPencilActive(active) {
   btn.classList.toggle('active', active);
 }
 
+export function renderNumpadHighlight(highlightNumber) {
+  document.querySelectorAll('.numpad-btn').forEach(btn => {
+    const val = parseInt(btn.dataset.value);
+    btn.classList.toggle('number-locked', val === highlightNumber);
+  });
+}
+
 export function bindEvents(handlers) {
-  // Board clicks
+  // Board clicks — manual double-click detection because the full board re-render
+  // on every click destroys the original DOM element, preventing native dblclick from firing.
+  let lastClickIndex = -1;
+  let lastClickTime = 0;
+  const DBL_CLICK_MS = 350;
+
   document.getElementById('board').addEventListener('click', e => {
     const cell = e.target.closest('.cell');
     if (!cell) return;
-    handlers.onCellClick(parseInt(cell.dataset.index));
+    const index = parseInt(cell.dataset.index);
+    const now = Date.now();
+
+    if (index === lastClickIndex && now - lastClickTime < DBL_CLICK_MS) {
+      lastClickIndex = -1;
+      lastClickTime = 0;
+      handlers.onCellDblClick(index);
+    } else {
+      lastClickIndex = index;
+      lastClickTime = now;
+      handlers.onCellClick(index);
+    }
   });
 
-  // Numpad
+  // Numpad — same manual double-click approach as the board
+  let lastNumpadValue = -1;
+  let lastNumpadTime = 0;
+
   document.getElementById('numpad').addEventListener('click', e => {
     const btn = e.target.closest('.numpad-btn');
     if (!btn) return;
     if (btn.id === 'numpad-erase') {
+      lastNumpadValue = -1;
       handlers.onErase();
+      return;
+    }
+    const value = parseInt(btn.dataset.value);
+    const now = Date.now();
+
+    if (value === lastNumpadValue && now - lastNumpadTime < DBL_CLICK_MS) {
+      lastNumpadValue = -1;
+      lastNumpadTime = 0;
+      handlers.onNumpadDblClick(value);
     } else {
-      handlers.onNumpadClick(parseInt(btn.dataset.value));
+      lastNumpadValue = value;
+      lastNumpadTime = now;
+      handlers.onNumpadClick(value);
     }
   });
 

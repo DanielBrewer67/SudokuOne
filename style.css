@@ -251,6 +251,9 @@ h1 {
 .cell.related   { background: var(--cell-related); }
 .cell.same-number { background: var(--cell-same-num); }
 .cell.editable:not(.selected):not(.related):hover { background: var(--surface-3); }
+.cell.number-locked { background: rgba(255, 209, 102, 0.18); }
+.cell.number-locked.selected { background: var(--cell-selected); }
+.cell.number-locked.related  { background: rgba(255, 209, 102, 0.28); }
 
 /* Notes sub-grid */
 .cell .notes {
@@ -335,6 +338,12 @@ h1 {
 .numpad-erase {
   font-size: 18px;
   color: var(--text-muted);
+}
+
+.numpad-btn.number-locked {
+  background: rgba(255, 209, 102, 0.18);
+  border-color: var(--yellow);
+  color: var(--yellow);
 }
 
 /* ─── Stats Panel ────────────────────────────────────────────────────────── */

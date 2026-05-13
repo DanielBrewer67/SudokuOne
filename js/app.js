@@ -6,7 +6,7 @@ import {
 import { createTimer, formatTime } from './timer.js';
 import { loadStats, saveGameResult, getAggregateStats } from './stats.js';
 import {
-  renderBoard, renderNumpad, renderInfoBar, renderStats,
+  renderBoard, renderNumpad, renderNumpadHighlight, renderInfoBar, renderStats,
   showWinOverlay, hideWinOverlay, showLoading, showNewGameModal,
   hideNewGameModal, showToast, shakeCellAt, setPencilActive, bindEvents,
 } from './ui.js';
@@ -14,6 +14,7 @@ import {
 let puzzleState = null;
 let selectedCell = null;
 let pencilMode = false;
+let highlightNumber = null;
 let timer = null;
 let currentGameMeta = null;
 let currentPanel = 'game';
@@ -25,7 +26,40 @@ function onCellClick(cellIndex) {
   } else {
     selectedCell = cellIndex;
   }
-  renderBoard(puzzleState, selectedCell, pencilMode);
+
+  // Clicking a correctly-placed cell highlights that number across the board
+  const val = puzzleState.board[cellIndex];
+  const isCorrect = val !== 0 && !puzzleState.errors[cellIndex];
+  if (isCorrect) {
+    highlightNumber = val;
+    renderNumpadHighlight(highlightNumber);
+  }
+
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
+}
+
+function onCellDblClick(cellIndex) {
+  if (!puzzleState || highlightNumber === null) return;
+  if (puzzleState.board[cellIndex] !== 0) return;
+  if (!isCellEditable(puzzleState, cellIndex)) return;
+
+  selectedCell = cellIndex;
+  if (pencilMode) {
+    puzzleState = applyNote(puzzleState, cellIndex, highlightNumber);
+  } else {
+    const prevErrors = puzzleState.errorCount;
+    puzzleState = applyMove(puzzleState, cellIndex, highlightNumber);
+    if (puzzleState.errorCount > prevErrors) shakeCellAt(cellIndex);
+  }
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
+  renderInfoBar(puzzleState, timer ? timer.getElapsed() : 0);
+  if (!pencilMode && checkWin(puzzleState)) handleWin();
+}
+
+function onNumpadDblClick(value) {
+  highlightNumber = highlightNumber === value ? null : value;
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
+  renderNumpadHighlight(highlightNumber);
 }
 
 function onNumpadClick(value) {
@@ -43,7 +77,7 @@ function onNumpadClick(value) {
     }
   }
   puzzleState = newState;
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
   renderInfoBar(puzzleState, timer ? timer.getElapsed() : 0);
 
   if (!pencilMode && checkWin(puzzleState)) {
@@ -94,7 +128,7 @@ function moveSelection(direction) {
     if (direction === 'ArrowRight') col = Math.min(8, col + 1);
     selectedCell = row * 9 + col;
   }
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
 }
 
 function onPencilToggle() {
@@ -105,21 +139,21 @@ function onPencilToggle() {
 function onErase() {
   if (selectedCell === null || !puzzleState) return;
   puzzleState = eraseCell(puzzleState, selectedCell);
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
   renderInfoBar(puzzleState, timer ? timer.getElapsed() : 0);
 }
 
 function onUndo() {
   if (!puzzleState) return;
   puzzleState = undoMove(puzzleState);
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
   renderInfoBar(puzzleState, timer ? timer.getElapsed() : 0);
 }
 
 function onAutoNotes() {
   if (!puzzleState) return;
   puzzleState = autoNotes(puzzleState);
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
 }
 
 function onHint() {
@@ -133,7 +167,7 @@ function onHint() {
   puzzleState = { ...puzzleState, hintsUsed: (puzzleState.hintsUsed || 0) + 1 };
   puzzleState = applyMove(puzzleState, hint.index, hint.value);
   selectedCell = hint.index;
-  renderBoard(puzzleState, selectedCell, pencilMode);
+  renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
   renderInfoBar(puzzleState, timer ? timer.getElapsed() : 0);
 
   if (checkWin(puzzleState)) {
@@ -223,7 +257,9 @@ async function startNewGame(difficulty) {
   if (timer) timer.stop();
   selectedCell = null;
   pencilMode = false;
+  highlightNumber = null;
   setPencilActive(false);
+  renderNumpadHighlight(null);
 
   showLoading(true);
 
@@ -237,7 +273,7 @@ async function startNewGame(difficulty) {
     });
     timer.start();
 
-    renderBoard(puzzleState, selectedCell, pencilMode);
+    renderBoard(puzzleState, selectedCell, pencilMode, highlightNumber);
     renderInfoBar(puzzleState, 0);
   } catch (err) {
     showToast(`Couldn't fetch puzzle: ${err.message}. Please try again.`, true);
@@ -271,7 +307,9 @@ document.addEventListener('DOMContentLoaded', () => {
   renderNumpad();
   bindEvents({
     onCellClick,
+    onCellDblClick,
     onNumpadClick,
+    onNumpadDblClick,
     onKeyDown,
     onPencilToggle,
     onErase,
