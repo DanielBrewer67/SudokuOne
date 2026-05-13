@@ -228,7 +228,7 @@ async function startNewGame(difficulty) {
   showLoading(true);
 
   try {
-    const rawPuzzle = await fetchPuzzle();
+    const rawPuzzle = await fetchPuzzle(difficulty);
     puzzleState = createPuzzle(rawPuzzle, difficulty);
     currentGameMeta = { difficulty, startedAt: Date.now() };
 

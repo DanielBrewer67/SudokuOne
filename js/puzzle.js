@@ -28,21 +28,26 @@ function shuffle(arr) {
   return arr;
 }
 
-const GIVEN_COUNTS = { easy: 38, medium: 29, hard: 24, expert: 18 };
-
 export function createPuzzle(rawPuzzle, difficulty) {
   const solution = flatten(rawPuzzle.solution);
-  const targetGivens = GIVEN_COUNTS[difficulty] ?? 29;
-  const cellsToRemove = 81 - targetGivens;
+  const valueFlat = flatten(rawPuzzle.value);
 
-  const indices = shuffle([...Array(81).keys()]);
-  const given = [...solution];
-
-  let removed = 0;
-  for (const idx of indices) {
-    if (removed >= cellsToRemove) break;
-    given[idx] = 0;
-    removed++;
+  // If the CSV provided an actual puzzle (some cells non-zero), use it directly.
+  // Otherwise fall back to random cell removal (used by the old API + offline fallback).
+  let given;
+  if (valueFlat.some(v => v !== 0)) {
+    given = valueFlat;
+  } else {
+    const GIVEN_COUNTS = { easy: 38, medium: 29, hard: 24, expert: 18 };
+    const cellsToRemove = 81 - (GIVEN_COUNTS[difficulty] ?? 29);
+    const indices = shuffle([...Array(81).keys()]);
+    given = [...solution];
+    let removed = 0;
+    for (const idx of indices) {
+      if (removed >= cellsToRemove) break;
+      given[idx] = 0;
+      removed++;
+    }
   }
 
   return {
